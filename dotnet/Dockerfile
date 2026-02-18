@@ -20,6 +20,8 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 COPY --from=build /app/publish .
+RUN ln -sf /app/runtimes/linux-x64/native/libonnxruntime.so /app/onnxruntime.dll \
+	&& ln -sf /app/runtimes/linux-x64/native/libonnxruntime_providers_shared.so /app/onnxruntime_providers_shared.dll
 COPY models/ /models/
 
 EXPOSE 8080
