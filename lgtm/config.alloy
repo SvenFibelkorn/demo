@@ -1,0 +1,57 @@
+// Receive OTLP (logs, metrics, traces) from apps on 4317/4318
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    logs   = [otelcol.processor.batch.default.input]
+    traces = [otelcol.processor.batch.default.input]
+    metrics = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    // Logs -> Loki (OTLP/HTTP)
+    logs = [otelcol.exporter.otlphttp.loki.input]
+
+    // Traces -> Tempo (OTLP/gRPC)
+    traces = [otelcol.exporter.otlp.tempo.input]
+
+    // Metrics -> convert to Prometheus format -> remote_write to Mimir
+    metrics = [otelcol.exporter.prometheus.prom.input]
+  }
+}
+
+// Loki: OTLP/HTTP endpoint (Loki listens on 3100; OTLP path is /otlp)
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+}
+
+// Tempo: OTLP/gRPC receiver on 4317 (from tempo.yaml)
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// Convert OTLP metrics to Prometheus and forward into Alloy's prometheus.* pipeline
+otelcol.exporter.prometheus "prom" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// Remote write to Mimir
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}

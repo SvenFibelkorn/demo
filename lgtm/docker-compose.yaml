@@ -1,0 +1,61 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000" # Access UI here
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./grafana-provisioning:/etc/grafana/provisioning
+      - ./data/grafana:/var/lib/grafana
+    networks:
+      - monitoring
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    ports:
+      - "4317:4317" # Exposed to receive OTLP/gRPC from your apps 
+      - "4318:4318" # Exposed to receive OTLP/HTTP from your apps 
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    # Ports removed: only Grafana needs to see Loki internally
+    volumes:
+      - ./loki.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring
+
+  mimir:
+    image: grafana/mimir:latest
+    container_name: mimir
+    # Ports removed: internal communication only
+    volumes:
+      - ./mimir.yaml:/etc/mimir/mimir.yaml
+    command: -config.file=/etc/mimir/mimir.yaml
+    networks:
+      - monitoring
+
+  tempo:
+    image: grafana/tempo:2.9.1
+    container_name: tempo
+    # Ports removed: internal communication only
+    volumes:
+      - ./tempo.yaml:/etc/tempo/tempo.yaml
+    command: -config.file=/etc/tempo/tempo.yaml
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge

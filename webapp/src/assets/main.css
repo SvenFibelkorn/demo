@@ -1,0 +1,254 @@
+@import './base.css';
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2rem;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+:root {
+  --color-background: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-background-soft: #f1f3f7;
+  --color-border: #dce1e8;
+  --color-heading: #141a23;
+  --color-text: #263241;
+  --color-text-muted: #6a7687;
+  --color-accent: #123a73;
+  --color-on-accent: #ffffff;
+  --color-danger: #b42318;
+}
+
+body {
+  background: radial-gradient(circle at top, #ffffff 0%, #f7f8fa 45%, #eff2f6 100%);
+  color: var(--color-text);
+}
+
+h1,
+h2,
+h3 {
+  color: var(--color-heading);
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: clamp(1rem, 0.8rem + 0.8vw, 1.6rem);
+}
+
+.panel h1 {
+  font-size: clamp(1.25rem, 1.1rem + 0.95vw, 1.8rem);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.lead {
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+
+.form.inline {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  column-gap: 0.8rem;
+}
+
+.form label,
+.toggle-group legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text);
+  padding: 0.6rem 0.7rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 25%, transparent);
+  border-color: var(--color-accent);
+}
+
+.button {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-heading);
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.2;
+}
+
+.button:hover:enabled {
+  background: var(--color-background-soft);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button.primary {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button.primary:hover:enabled {
+  background: color-mix(in oklab, var(--color-accent) 88%, black);
+}
+
+.toggle-group {
+  display: flex;
+  gap: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
+.toggle-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.result-card {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--color-surface) 80%, #f1f5fb);
+  padding: 0.95rem;
+}
+
+.result-meta {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.summary-text {
+  white-space: pre-wrap;
+}
+
+.article-section {
+  margin-top: 1.2rem;
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.article-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.article-item {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  padding: 0.85rem;
+}
+
+.article-head h3 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.35;
+  margin-bottom: 0.25rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.teaser {
+  margin-top: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.action-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.empty-state {
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.error-message {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.info-message {
+  color: var(--color-accent);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 760px) {
+  #app {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .form.inline {
+    grid-template-columns: 1fr;
+  }
+}

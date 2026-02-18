@@ -1,0 +1,33 @@
+[
+  {
+    "id": "019c3731-0a5a-7ac2-8f67-734581628447",
+    "url": "https://www.economist.com/",
+    "name": "The Economist"
+  },
+  {
+    "id": "019c3731-b3e7-766f-b327-7e2474fc2477",
+    "url": "https://www.theverge.com/",
+    "name": "The Verge"
+  },
+  {
+    "id": "019c3732-6ee1-7067-b0dd-5d0149d3a1d9",
+    "url": "https://www.zeit.de/index/",
+    "name": "Die Zeit"
+  }
+]
+
+{
+  "id": "019c3748-ea3f-750f-8b00-e8d857f7d388",
+  "link": "https://www.economist.com/leaders/2026/02/05/as-global-press-freedom-dwindles-corrupt-politicians-rejoice",
+  "organizationId": "019c3731-0a5a-7ac2-8f67-734581628447",
+  "organization": null,
+  "headline": "As global press freedom dwindles, corrupt politicians rejoice",
+  "description": "Less scrutiny, more booty",
+  "summary": null,
+  "content": null
+}
+
+Montags bis Freitags 8:00 - 12:00
+
+
+nUlL2x5-F,5,B.9AUwhq1

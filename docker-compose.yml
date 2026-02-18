@@ -1,0 +1,158 @@
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demo_db
+    ports:
+      - "5429:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demo_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dotnet:
+    build:
+      context: .
+      dockerfile: dotnet/Dockerfile
+    image: demo-dotnet:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__PostgresConnection: Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=postgres
+      ConnectionStrings__Redis: redis:6379
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: demo-dotnet
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,service.namespace=demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      alloy:
+        condition: service_started
+    ports:
+      - "5271:8080"
+    networks:
+      - default
+      - monitoring
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    image: demo-scheduler:latest
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ConnectionStrings__PostgresConnection: Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=postgres
+      ConnectionStrings__Redis: redis:6379
+      OpenTelemetry__Endpoint: http://alloy:4317
+      OTEL_SERVICE_NAME: demo-scheduler
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production,service.namespace=demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      alloy:
+        condition: service_started
+    volumes:
+      - ./corpus:/corpus:ro
+    networks:
+      - default
+      - monitoring
+
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:5271
+    image: demo-webapp:latest
+    depends_on:
+      - dotnet
+    ports:
+      - "8080:80"
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./lgtm/grafana-provisioning:/etc/grafana/provisioning
+      - ./lgtm/data/grafana:/var/lib/grafana
+    networks:
+      - monitoring
+
+  alloy:
+    image: grafana/alloy:latest
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./lgtm/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - loki
+      - mimir
+      - tempo
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./lgtm/loki.yaml:/etc/loki/local-config.yaml:ro
+      - ./lgtm/data/loki:/loki
+    networks:
+      - monitoring
+
+  mimir:
+    image: grafana/mimir:latest
+    command: -config.file=/etc/mimir/mimir.yaml
+    volumes:
+      - ./lgtm/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - ./lgtm/data/mimir:/tmp/mimir
+    networks:
+      - monitoring
+
+  tempo:
+    image: grafana/tempo:2.9.1
+    command: -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ./lgtm/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - ./lgtm/data/tempo:/var/tempo
+      - ./lgtm/data/tempo:/tmp/tempo
+    networks:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  monitoring:
+    driver: bridge

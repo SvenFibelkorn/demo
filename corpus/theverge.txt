@@ -1,0 +1,15 @@
+https://www.theverge.com/rss/index.xml
+https://www.theverge.com/rss/quickposts
+https://www.theverge.com/rss/features/index.xml
+https://www.theverge.com/rss/exclusive/index.xml
+https://www.theverge.com/rss/news/index.xml
+https://www.theverge.com/rss/tech/index.xml
+https://www.theverge.com/rss/ai-artificial-intelligence/index.xml
+https://www.theverge.com/rss/gadgets/index.xml
+https://www.theverge.com/rss/games/index.xml
+https://www.theverge.com/rss/reviews/index.xml
+https://www.theverge.com/rss/science/index.xml
+https://www.theverge.com/rss/entertainment/index.xml
+https://www.theverge.com/rss/streaming/index.xml
+https://www.theverge.com/rss/policy/index.xml
+https://www.theverge.com/rss/transportation/index.xml

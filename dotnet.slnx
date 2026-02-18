@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="dotnet/dotnet.csproj" />
+  <Project Path="scheduler/scheduler.csproj" />
+</Solution>
