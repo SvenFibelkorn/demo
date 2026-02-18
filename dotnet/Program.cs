@@ -13,6 +13,13 @@ using Microsoft.Extensions.Options;
 using Pgvector.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var groqApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
+if (!string.IsNullOrWhiteSpace(groqApiKey))
+{
+    builder.Configuration["Groq:ApiKey"] = groqApiKey;
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("PostgresConnection"),

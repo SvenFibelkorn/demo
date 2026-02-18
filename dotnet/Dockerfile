@@ -18,6 +18,7 @@ RUN apt-get update \
 
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV GROQ_API_KEY=
 
 COPY --from=build /app/publish .
 RUN ln -sf /app/runtimes/linux-x64/native/libonnxruntime.so /app/onnxruntime.dll \

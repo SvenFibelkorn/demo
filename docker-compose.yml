@@ -38,6 +38,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__PostgresConnection: Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=postgres
       ConnectionStrings__Redis: redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_SERVICE_NAME: demo-dotnet
