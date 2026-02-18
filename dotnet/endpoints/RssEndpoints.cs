@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
@@ -7,11 +8,24 @@ using Microsoft.EntityFrameworkCore;
 using dotnet.data;
 using dotnet.models;
 using Pgvector;
+using StackExchange.Redis;
 
 namespace dotnet.endpoints;
 
 public static class RssEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan OrganizationCacheTtl = TimeSpan.FromHours(1);
+    private static readonly TimeSpan OrganizationNotFoundCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan SearchCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan NewestCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan SimilarCacheTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan DaySummaryCacheTtl = TimeSpan.FromMinutes(30);
+    private const string NullCacheMarker = "__null__";
+    private const string NewestCacheKeysSet = "articles:newest:keys";
+    private const string SearchCacheKeysSet = "articles:search:keys";
+    private const string SimilarCacheKeysSet = "articles:similar:keys";
+
     private static string Slugify(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -42,6 +56,7 @@ public static class RssEndpoints
 
     private static async Task<Organization?> FindOrganizationBySlugAsync(
         AppDbContext db,
+        IDatabase redis,
         string slug,
         CancellationToken cancellationToken = default)
     {
@@ -51,11 +66,225 @@ public static class RssEndpoints
             return null;
         }
 
+        var cacheKey = $"organizations:slug:{normalizedSlug}";
+        try
+        {
+            var cached = await redis.StringGetAsync(cacheKey);
+            if (cached.HasValue)
+            {
+                if (cached == NullCacheMarker)
+                {
+                    return null;
+                }
+
+                var cachedOrganization = JsonSerializer.Deserialize<Organization>(cached.ToString(), JsonOptions);
+                if (cachedOrganization is not null)
+                {
+                    return cachedOrganization;
+                }
+            }
+        }
+        catch
+        {
+        }
+
         var organizations = await db.Organizations
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        return organizations.FirstOrDefault(org => Slugify(org.Name) == normalizedSlug);
+        var organization = organizations.FirstOrDefault(org => Slugify(org.Name) == normalizedSlug);
+
+        try
+        {
+            if (organization is null)
+            {
+                await redis.StringSetAsync(cacheKey, NullCacheMarker, OrganizationNotFoundCacheTtl);
+            }
+            else
+            {
+                var serialized = JsonSerializer.Serialize(organization, JsonOptions);
+                await redis.StringSetAsync(cacheKey, serialized, OrganizationCacheTtl);
+            }
+        }
+        catch
+        {
+        }
+
+        return organization;
+    }
+
+    private static async Task<T?> TryGetCachedAsync<T>(IDatabase redis, string key)
+    {
+        try
+        {
+            var cached = await redis.StringGetAsync(key);
+            if (!cached.HasValue)
+            {
+                return default;
+            }
+
+            return JsonSerializer.Deserialize<T>(cached.ToString(), JsonOptions);
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private static async Task TrySetCachedAsync<T>(IDatabase redis, string key, T value, TimeSpan ttl)
+    {
+        try
+        {
+            var serialized = JsonSerializer.Serialize(value, JsonOptions);
+            await redis.StringSetAsync(key, serialized, ttl);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task InvalidateOrganizationSlugCacheAsync(IDatabase redis, string slugOrName)
+    {
+        var normalizedSlug = Slugify(slugOrName);
+        if (string.IsNullOrWhiteSpace(normalizedSlug))
+        {
+            return;
+        }
+
+        try
+        {
+            await redis.KeyDeleteAsync($"organizations:slug:{normalizedSlug}");
+        }
+        catch
+        {
+        }
+    }
+
+    private static string CacheHash(string value)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private static string BuildNewestCacheKey(string? organization)
+    {
+        var normalizedOrganization = string.IsNullOrWhiteSpace(organization)
+            ? string.Empty
+            : organization.Trim().ToLowerInvariant();
+        return $"articles:newest:{CacheHash(normalizedOrganization)}";
+    }
+
+    private static async Task TrackNewestCacheKeyAsync(IDatabase redis, string newestCacheKey)
+    {
+        try
+        {
+            await redis.SetAddAsync(NewestCacheKeysSet, newestCacheKey);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task TrackSearchCacheKeyAsync(IDatabase redis, string searchCacheKey)
+    {
+        try
+        {
+            await redis.SetAddAsync(SearchCacheKeysSet, searchCacheKey);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task TrackSimilarCacheKeyAsync(IDatabase redis, string similarCacheKey)
+    {
+        try
+        {
+            await redis.SetAddAsync(SimilarCacheKeysSet, similarCacheKey);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task InvalidateNewestCachesAsync(IDatabase redis)
+    {
+        try
+        {
+            var trackedKeys = await redis.SetMembersAsync(NewestCacheKeysSet);
+            if (trackedKeys.Length == 0)
+            {
+                await redis.KeyDeleteAsync(BuildNewestCacheKey(null));
+                return;
+            }
+
+            var keysToDelete = trackedKeys
+                .Where(k => k.HasValue)
+                .Select(k => (RedisKey)k.ToString())
+                .ToList();
+
+            keysToDelete.Add(BuildNewestCacheKey(null));
+
+            await redis.KeyDeleteAsync(keysToDelete.ToArray());
+            await redis.KeyDeleteAsync(NewestCacheKeysSet);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task InvalidateSearchCachesAsync(IDatabase redis)
+    {
+        try
+        {
+            var trackedKeys = await redis.SetMembersAsync(SearchCacheKeysSet);
+            if (trackedKeys.Length == 0)
+            {
+                return;
+            }
+
+            var keysToDelete = trackedKeys
+                .Where(k => k.HasValue)
+                .Select(k => (RedisKey)k.ToString())
+                .ToArray();
+
+            if (keysToDelete.Length > 0)
+            {
+                await redis.KeyDeleteAsync(keysToDelete);
+            }
+
+            await redis.KeyDeleteAsync(SearchCacheKeysSet);
+        }
+        catch
+        {
+        }
+    }
+
+    private static async Task InvalidateSimilarCachesAsync(IDatabase redis)
+    {
+        try
+        {
+            var trackedKeys = await redis.SetMembersAsync(SimilarCacheKeysSet);
+            if (trackedKeys.Length == 0)
+            {
+                return;
+            }
+
+            var keysToDelete = trackedKeys
+                .Where(k => k.HasValue)
+                .Select(k => (RedisKey)k.ToString())
+                .ToArray();
+
+            if (keysToDelete.Length > 0)
+            {
+                await redis.KeyDeleteAsync(keysToDelete);
+            }
+
+            await redis.KeyDeleteAsync(SimilarCacheKeysSet);
+        }
+        catch
+        {
+        }
     }
 
     public static void MapRssEndpoints(this IEndpointRouteBuilder app)
@@ -81,7 +310,7 @@ public static class RssEndpoints
         });
 
         // Create new organization
-        group.MapPost("/organizations", async (AppDbContext db, Organization org) =>
+        group.MapPost("/organizations", async (AppDbContext db, IDatabase redis, Organization org) =>
         {
             //if (org.Id == Guid.Empty)
             //{
@@ -90,14 +319,15 @@ public static class RssEndpoints
 
             db.Organizations.Add(org);
             await db.SaveChangesAsync();
+            await InvalidateOrganizationSlugCacheAsync(redis, org.Name);
 
             return Results.Created($"/api/rss/organizations/{org.Id}", org);
         });
 
         // Delete organization by id
-        group.MapDelete("/organizations/{slug}", async (AppDbContext db, string slug, CancellationToken cancellationToken) =>
+        group.MapDelete("/organizations/{slug}", async (AppDbContext db, IDatabase redis, string slug, CancellationToken cancellationToken) =>
         {
-            var org = await FindOrganizationBySlugAsync(db, slug, cancellationToken);
+            var org = await FindOrganizationBySlugAsync(db, redis, slug, cancellationToken);
             if (org == null)
             {
                 return Results.NotFound(new { error = "organization not found", slug });
@@ -109,6 +339,10 @@ public static class RssEndpoints
 
             db.Organizations.Remove(org);
             await db.SaveChangesAsync(cancellationToken);
+            await InvalidateOrganizationSlugCacheAsync(redis, slug);
+            await InvalidateNewestCachesAsync(redis);
+            await InvalidateSearchCachesAsync(redis);
+            await InvalidateSimilarCachesAsync(redis);
             return Results.NoContent();
         });
 
@@ -120,7 +354,7 @@ public static class RssEndpoints
         });
 
         // Create new article
-        group.MapPost("/articles", async (AppDbContext db, Article article) =>
+        group.MapPost("/articles", async (AppDbContext db, IDatabase redis, Article article) =>
         {
             //if (article.Id == Guid.Empty)
             //{
@@ -131,6 +365,9 @@ public static class RssEndpoints
             try
             {
                 await db.SaveChangesAsync();
+                await InvalidateNewestCachesAsync(redis);
+                await InvalidateSearchCachesAsync(redis);
+                await InvalidateSimilarCachesAsync(redis);
             }
             catch (DbUpdateException ex)
             {
@@ -141,7 +378,7 @@ public static class RssEndpoints
         });
 
         // Delete article by id
-        group.MapDelete("/articles/{id:guid}", async (AppDbContext db, Guid id) =>
+        group.MapDelete("/articles/{id:guid}", async (AppDbContext db, IDatabase redis, Guid id) =>
         {
             var article = await db.Articles.FindAsync(id);
             if (article == null)
@@ -151,11 +388,14 @@ public static class RssEndpoints
 
             db.Articles.Remove(article);
             await db.SaveChangesAsync();
+            await InvalidateNewestCachesAsync(redis);
+            await InvalidateSearchCachesAsync(redis);
+            await InvalidateSimilarCachesAsync(redis);
             return Results.NoContent();
         });
 
         // Delete all articles
-        group.MapDelete("/articles", async (AppDbContext db) =>
+        group.MapDelete("/articles", async (AppDbContext db, IDatabase redis) =>
         {
             var articles = await db.Articles.ToListAsync();
             if (articles.Count == 0)
@@ -165,6 +405,9 @@ public static class RssEndpoints
 
             db.Articles.RemoveRange(articles);
             await db.SaveChangesAsync();
+            await InvalidateNewestCachesAsync(redis);
+            await InvalidateSearchCachesAsync(redis);
+            await InvalidateSimilarCachesAsync(redis);
             return Results.NoContent();
         });
 
@@ -178,6 +421,8 @@ public static class RssEndpoints
         // Search articles by text, optionally filtered by organization slug
         group.MapGet("/articles/search", async (
             AppDbContext db,
+            IDatabase redis,
+            HttpContext httpContext,
             string query,
             string? organizationSlug,
             CancellationToken cancellationToken) =>
@@ -188,6 +433,20 @@ public static class RssEndpoints
             }
 
             var searchTerm = query.Trim();
+            var normalizedOrganizationSlug = string.IsNullOrWhiteSpace(organizationSlug)
+                ? string.Empty
+                : Slugify(organizationSlug);
+            var searchCacheKey = $"articles:search:{CacheHash($"{searchTerm.ToLowerInvariant()}|{normalizedOrganizationSlug}")}";
+
+            var cachedSearchResults = await TryGetCachedAsync<List<Article>>(redis, searchCacheKey);
+            if (cachedSearchResults is not null)
+            {
+                httpContext.Response.Headers["X-Cache"] = "HIT";
+                return Results.Json(cachedSearchResults);
+            }
+
+            httpContext.Response.Headers["X-Cache"] = "MISS";
+
             var pattern = $"%{searchTerm}%";
 
             var articleQuery = db.Articles
@@ -197,7 +456,7 @@ public static class RssEndpoints
 
             if (!string.IsNullOrWhiteSpace(organizationSlug))
             {
-                var organization = await FindOrganizationBySlugAsync(db, organizationSlug, cancellationToken);
+                var organization = await FindOrganizationBySlugAsync(db, redis, organizationSlug, cancellationToken);
                 if (organization == null)
                 {
                     return Results.NotFound(new
@@ -222,13 +481,16 @@ public static class RssEndpoints
                 .Take(10)
                 .ToListAsync(cancellationToken);
 
+            await TrySetCachedAsync(redis, searchCacheKey, matches, SearchCacheTtl);
+            await TrackSearchCacheKeyAsync(redis, searchCacheKey);
+
             return Results.Json(matches);
         });
 
         // Get all articles for a specific organization (including organization)
-        group.MapGet("/articles/{organizationSlug}", async (AppDbContext db, string organizationSlug, CancellationToken cancellationToken) =>
+        group.MapGet("/articles/{organizationSlug}", async (AppDbContext db, IDatabase redis, string organizationSlug, CancellationToken cancellationToken) =>
         {
-            var organization = await FindOrganizationBySlugAsync(db, organizationSlug, cancellationToken);
+            var organization = await FindOrganizationBySlugAsync(db, redis, organizationSlug, cancellationToken);
             if (organization == null)
             {
                 return Results.NotFound(new { error = "organization not found", organizationSlug });
@@ -254,12 +516,22 @@ public static class RssEndpoints
         });
 
         // Get top-10 most similar articles for a given link (by title or summary embedding)
-        group.MapGet("/articles/similar", async (AppDbContext db, string Link) =>
+        group.MapGet("/articles/similar", async (AppDbContext db, IDatabase redis, HttpContext httpContext, string Link) =>
         {
             if (!Uri.TryCreate(Link, UriKind.Absolute, out var uri))
             {
                 return Results.BadRequest(new { error = "invalid link" });
             }
+
+            var similarCacheKey = $"articles:similar:{CacheHash(uri.AbsoluteUri.ToLowerInvariant())}";
+            var cachedSimilar = await TryGetCachedAsync<List<Article>>(redis, similarCacheKey);
+            if (cachedSimilar is not null)
+            {
+                httpContext.Response.Headers["X-Cache"] = "HIT";
+                return Results.Json(cachedSimilar);
+            }
+
+            httpContext.Response.Headers["X-Cache"] = "MISS";
 
             var src = await db.Articles.AsNoTracking().FirstOrDefaultAsync(a => a.Link == uri);
             if (src == null)
@@ -280,6 +552,9 @@ public static class RssEndpoints
                 .Include(a => a.Organization)
                 .AsNoTracking()
                 .ToListAsync();
+
+            await TrySetCachedAsync(redis, similarCacheKey, similar, SimilarCacheTtl);
+            await TrackSimilarCacheKeyAsync(redis, similarCacheKey);
 
             return Results.Json(similar);
         });
@@ -363,9 +638,22 @@ public static class RssEndpoints
         // Get 10 newest articles, optionally filtered by organization name
         group.MapGet("/articles/newest", async (
             AppDbContext db,
+            IDatabase redis,
+            HttpContext httpContext,
             string? organization,
             CancellationToken cancellationToken) =>
         {
+            var newestCacheKey = BuildNewestCacheKey(organization);
+
+            var cachedNewest = await TryGetCachedAsync<List<Article>>(redis, newestCacheKey);
+            if (cachedNewest is not null)
+            {
+                httpContext.Response.Headers["X-Cache"] = "HIT";
+                return Results.Json(cachedNewest);
+            }
+
+            httpContext.Response.Headers["X-Cache"] = "MISS";
+
             var query = db.Articles
                 .Include(a => a.Organization)
                 .AsNoTracking()
@@ -380,9 +668,13 @@ public static class RssEndpoints
             }
 
             var newest = await query
-                .OrderByDescending(a => a.Id)
+                .OrderByDescending(a => a.PublicationDate)
+                .ThenByDescending(a => a.Id)
                 .Take(10)
                 .ToListAsync(cancellationToken);
+
+            await TrySetCachedAsync(redis, newestCacheKey, newest, NewestCacheTtl);
+            await TrackNewestCacheKeyAsync(redis, newestCacheKey);
 
             return Results.Json(newest);
         });
@@ -390,6 +682,8 @@ public static class RssEndpoints
         // Summarize recent news articles with Groq (last 24h, optional organization filter)
         group.MapPost("/articles/day-summary", async (
             AppDbContext db,
+            IDatabase redis,
+            HttpContext httpContext,
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
             DaySummaryRequest request,
@@ -400,7 +694,23 @@ public static class RssEndpoints
                 return Results.BadRequest(new { error = "query is required" });
             }
 
-            var groqApiKey = configuration["Groq:ApiKey"];
+            var normalizedQuery = request.Query.Trim();
+            var normalizedOrganizationSlug = string.IsNullOrWhiteSpace(request.OrganizationSlug)
+                ? string.Empty
+                : Slugify(request.OrganizationSlug);
+            var hourBucket = DateTime.UtcNow.ToString("yyyyMMddHH");
+            var daySummaryCacheKey = $"articles:day-summary:{CacheHash($"{normalizedQuery.ToLowerInvariant()}|{normalizedOrganizationSlug}|{hourBucket}")}";
+
+            var cachedSummary = await TryGetCachedAsync<DaySummaryResponse>(redis, daySummaryCacheKey);
+            if (cachedSummary is not null)
+            {
+                httpContext.Response.Headers["X-Cache"] = "HIT";
+                return Results.Json(cachedSummary);
+            }
+
+            httpContext.Response.Headers["X-Cache"] = "MISS";
+
+            var groqApiKey = configuration["GROQ_API_KEY"] ?? configuration["Groq:ApiKey"];
             if (string.IsNullOrWhiteSpace(groqApiKey))
             {
                 return Results.Problem("Groq API key is missing. Set Groq:ApiKey in user secrets.");
@@ -417,7 +727,7 @@ public static class RssEndpoints
             var organizationSlugFilter = request.OrganizationSlug;
             if (!string.IsNullOrWhiteSpace(organizationSlugFilter))
             {
-                var organization = await FindOrganizationBySlugAsync(db, organizationSlugFilter, cancellationToken);
+                var organization = await FindOrganizationBySlugAsync(db, redis, organizationSlugFilter, cancellationToken);
                 if (organization == null)
                 {
                     return Results.NotFound(new
@@ -535,17 +845,20 @@ public static class RssEndpoints
                 return Results.Problem($"Failed to parse Groq response: {ex.Message}");
             }
 
-            return Results.Json(new
-            {
-                query = request.Query,
-                organizationSlug = organizationSlugFilter,
-                cutoffUtc = cutoff,
-                articleCount = articles.Count,
-                summary = completion
-            });
+            var summaryResponse = new DaySummaryResponse(
+                request.Query,
+                organizationSlugFilter,
+                cutoff,
+                articles.Count,
+                completion);
+
+            await TrySetCachedAsync(redis, daySummaryCacheKey, summaryResponse, DaySummaryCacheTtl);
+
+            return Results.Json(summaryResponse);
         });
     }
 
     public sealed record SimilarArticlesTextRequest(string Text);
     public sealed record DaySummaryRequest(string Query, string? OrganizationSlug);
+    public sealed record DaySummaryResponse(string Query, string? OrganizationSlug, DateTime CutoffUtc, int ArticleCount, string? Summary);
 }

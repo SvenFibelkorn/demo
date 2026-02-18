@@ -11,14 +11,19 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Microsoft.Extensions.Options;
 using Pgvector.EntityFrameworkCore;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var groqApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
 if (!string.IsNullOrWhiteSpace(groqApiKey))
 {
-    builder.Configuration["Groq:ApiKey"] = groqApiKey;
+    builder.Configuration["GROQ_API_KEY"] = groqApiKey;
 }
+
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnectionString));
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
@@ -80,6 +85,7 @@ builder.Services.AddOpenTelemetry()
                 tracing.AddAspNetCoreInstrumentation()
                     .AddGrpcClientInstrumentation()
                     .AddHttpClientInstrumentation()
+                    .AddRedisInstrumentation()
                     .AddEntityFrameworkCoreInstrumentation()
                     .AddOtlpExporter(options =>
                     {
