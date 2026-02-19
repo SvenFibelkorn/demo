@@ -1,0 +1,17 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+  encode zstd gzip
+
+  @api path /api*
+  handle @api {
+    uri strip_prefix /api
+    reverse_proxy dotnet:8080
+  }
+
+  handle {
+    reverse_proxy webapp:80
+  }
+}

@@ -1,0 +1,72 @@
+include:
+  - docker-compose.yml
+  
+services:
+  postgres:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5429:5432"
+
+  redis:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:8001:8001"
+
+  dotnet:
+    restart: unless-stopped
+    ports: []
+
+  scheduler:
+    restart: unless-stopped
+
+  webapp:
+    restart: unless-stopped
+    build:
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    ports: []
+
+  grafana:
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env.prod}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  alloy:
+    restart: unless-stopped
+    ports: []
+
+  loki:
+    restart: unless-stopped
+
+  mimir:
+    restart: unless-stopped
+
+  tempo:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - webapp
+      - dotnet
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env.hetzner}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
