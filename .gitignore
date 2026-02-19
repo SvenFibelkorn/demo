@@ -87,8 +87,8 @@ __pycache__/
 *.onnx
 *.safetensors
 
-# Large local model assets
-models/
+# Large local model assets (root only)
+/models/
 
 # =========================
 # Runtime data / local state

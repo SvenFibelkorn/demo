@@ -3,7 +3,7 @@ services:
     image: ankane/pgvector:latest
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: demo_db
     ports:
       - "5429:5432"
@@ -36,7 +36,7 @@ services:
     image: demo-dotnet:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__PostgresConnection: Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=postgres
+      ConnectionStrings__PostgresConnection: "Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       ConnectionStrings__Redis: redis:6379
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4317
@@ -63,7 +63,7 @@ services:
     image: demo-scheduler:latest
     environment:
       DOTNET_ENVIRONMENT: Production
-      ConnectionStrings__PostgresConnection: Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=postgres
+      ConnectionStrings__PostgresConnection: "Host=postgres;Port=5432;Database=demo_db;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       ConnectionStrings__Redis: redis:6379
       OpenTelemetry__Endpoint: http://alloy:4317
       OTEL_SERVICE_NAME: demo-scheduler
