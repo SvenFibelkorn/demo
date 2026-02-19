@@ -11,6 +11,7 @@ using OpenTelemetry.Trace;
 using TickerQ.Caching.StackExchangeRedis.DependencyInjection;
 using TickerQ.DependencyInjection;
 using TickerQ.Instrumentation.OpenTelemetry;
+using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -86,9 +87,21 @@ builder.Services.AddTickerQ(options =>
 {
     options.IgnoreSeedDefinedCronTickers();
 
+    var configuredRedisConnection = builder.Configuration.GetConnectionString("Redis");
+    var defaultRedisHost = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"
+        ? "redis:6379"
+        : "localhost:6379";
+
+    var redisConfiguration = ConfigurationOptions.Parse(
+        string.IsNullOrWhiteSpace(configuredRedisConnection) ? defaultRedisHost : configuredRedisConnection,
+        true);
+
+    redisConfiguration.AbortOnConnectFail = false;
+    redisConfiguration.ConnectRetry = Math.Max(redisConfiguration.ConnectRetry, 10);
+
     options.AddStackExchangeRedis(redisOptions =>
     {
-        redisOptions.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+        redisOptions.Configuration = redisConfiguration.ToString();
         redisOptions.InstanceName = builder.Configuration["TickerQ:InstanceName"] ?? "tickerq:scheduler:";
         redisOptions.NodeHeartbeatInterval = TimeSpan.FromMinutes(1);
     });
