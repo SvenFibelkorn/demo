@@ -127,7 +127,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./lgtm/loki.yaml:/etc/loki/local-config.yaml:ro
-      - ./lgtm/data/loki:/loki
+      - loki_data:/loki
     networks:
       - monitoring
 
@@ -136,7 +136,7 @@ services:
     command: -config.file=/etc/mimir/mimir.yaml
     volumes:
       - ./lgtm/mimir.yaml:/etc/mimir/mimir.yaml:ro
-      - ./lgtm/data/mimir:/tmp/mimir
+      - mimir_data:/tmp/mimir
     networks:
       - monitoring
 
@@ -145,8 +145,7 @@ services:
     command: -config.file=/etc/tempo/tempo.yaml
     volumes:
       - ./lgtm/tempo.yaml:/etc/tempo/tempo.yaml:ro
-      - ./lgtm/data/tempo:/var/tempo
-      - ./lgtm/data/tempo:/tmp/tempo
+      - tempo_data:/var/tempo
     networks:
       - monitoring
 
@@ -154,7 +153,10 @@ volumes:
   postgres_data:
   redis_data:
   grafana_data:
-
+  tempo_data:
+  loki_data:
+  mimir_data:
+  
 networks:
   monitoring:
     driver: bridge
