@@ -4,14 +4,11 @@ include:
 services:
   postgres:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5429:5432"
+    ports: []
 
   redis:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
-      - "127.0.0.1:8001:8001"
+    ports: []
 
   dotnet:
     restart: unless-stopped
@@ -34,8 +31,6 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "false"
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env.prod}
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://${DOMAIN}/grafana}
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     ports:
       - "127.0.0.1:3000:3000"
 
