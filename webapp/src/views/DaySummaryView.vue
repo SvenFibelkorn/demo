@@ -48,7 +48,7 @@ async function submitSummaryRequest(): Promise<void> {
         placeholder="What happened in AI regulation today?"
       />
 
-      <label for="organization">Organization filter (optional)</label>
+      <label for="organization">News organization</label>
       <select id="organization" v-model="organizationSlug">
         <option value="">All organizations</option>
         <option v-for="option in ORGANIZATION_FILTERS" :key="option.slug" :value="option.slug">

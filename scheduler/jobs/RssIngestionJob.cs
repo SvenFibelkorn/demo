@@ -203,9 +203,11 @@ public sealed class RssIngestionJob
         [
             Path.Combine(repoRoot, "corpus", "economist.txt"),
             Path.Combine(repoRoot, "corpus", "theverge.txt"),
-            Path.Combine(repoRoot, "corpus", "arstechnica.txt"),
             Path.Combine(repoRoot, "corpus", "zeit.txt"),
+            Path.Combine(repoRoot, "corpus", "foreignaffairs.txt"),
             Path.Combine(repoRoot, "corpus", "semafor.txt"),
+            Path.Combine(repoRoot, "corpus", "arstechnica.txt"),
+            Path.Combine(repoRoot, "corpus", "faz.txt"),
             Path.Combine(repoRoot, "corpus", "dw.txt")
         ];
     }
@@ -258,6 +260,31 @@ public sealed class RssIngestionJob
         if (fileName.Contains("zeit"))
         {
             return ("DIE ZEIT", new Uri("https://www.zeit.de"));
+        }
+
+        if (fileName.Contains("foreignaffairs"))
+        {
+            return ("Foreign Affairs", new Uri("https://www.foreignaffairs.com"));
+        }
+
+        if (fileName.Contains("semafor"))
+        {
+            return ("Semafor", new Uri("https://www.semafor.com"));
+        }
+
+        if (fileName.Contains("arstechnica"))
+        {
+            return ("Ars Technica", new Uri("https://www.arstechnica.com"));
+        }
+
+        if (fileName.Contains("faz"))
+        {
+            return ("FAZ", new Uri("https://www.faz.net"));
+        }
+
+        if (fileName.Contains("dw"))
+        {
+            return ("DW", new Uri("https://www.dw.com"));
         }
 
         var firstUrl = feedUrls.FirstOrDefault();

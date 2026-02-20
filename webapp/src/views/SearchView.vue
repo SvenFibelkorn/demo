@@ -43,7 +43,7 @@ async function runSearch(): Promise<void> {
 <template>
   <section class="panel">
     <h1>Article Search</h1>
-    <p class="lead">Search by text or semantic similarity. Text search is the default mode.</p>
+    <p class="lead">Search by text or semantic similarity.</p>
 
     <form class="form" @submit.prevent="runSearch">
       <label for="search-query">Search text</label>

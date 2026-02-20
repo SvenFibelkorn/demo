@@ -33,18 +33,20 @@ onMounted(async () => {
 <template>
   <section class="panel">
     <h1>Newest Articles</h1>
-    <p class="lead">Display the 10 newest articles with an optional organization filter.</p>
+    <!-- <p class="lead">Display the 10 newest articles</p> -->
 
-    <form class="form inline" @submit.prevent="loadNewest">
-      <label for="newest-organization">Organization (optional)</label>
-      <select id="newest-organization" v-model="selectedOrganization">
-        <option value="">All organizations</option>
-        <option v-for="option in ORGANIZATION_FILTERS" :key="option.slug" :value="option.name">
-          {{ option.label }}
-        </option>
-      </select>
+    <form class="form newest-form" @submit.prevent="loadNewest">
+      <div class="newest-organization-field">
+        <label for="newest-organization">News organization</label>
+        <select id="newest-organization" v-model="selectedOrganization">
+          <option value="">All organizations</option>
+          <option v-for="option in ORGANIZATION_FILTERS" :key="option.slug" :value="option.name">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
 
-      <button type="submit" class="button primary" :disabled="loading">
+      <button type="submit" class="button primary newest-refresh" :disabled="loading">
         {{ loading ? 'Loading…' : 'Refresh' }}
       </button>
     </form>
@@ -58,3 +60,36 @@ onMounted(async () => {
     />
   </section>
 </template>
+
+<style scoped>
+.newest-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+}
+
+.newest-organization-field {
+  flex: 1 1 20rem;
+}
+
+.newest-organization-field label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.newest-refresh {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+@media (max-width: 760px) {
+  .newest-form {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .newest-refresh {
+    width: 100%;
+  }
+}
+</style>

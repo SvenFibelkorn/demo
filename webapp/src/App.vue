@@ -6,7 +6,7 @@ import { RouterLink, RouterView } from 'vue-router'
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <p class="kicker">Live Intelligence</p>
+        <p class="kicker">Sven Fibelkorn's Demo</p>
         <h1>News Desk</h1>
       </div>
       <nav>
