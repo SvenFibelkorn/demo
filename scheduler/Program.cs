@@ -114,14 +114,3 @@ builder.Services.AddHostedService<SchedulerBootstrapper>();
 var host = builder.Build();
 host.UseTickerQ();
 host.Run();
-
-//019c3731-0a5a-7ac2-8f67-734581628447  economist
-//019c3731-b3e7-766f-b327-7e2474fc2477  theverge
-//33518533-9a3c-454a-90e9-4af9205d9af3  zeit
-
-
-//  {
-//    "id": "33518533-9a3c-454a-90e9-4af9205d9af3",
-//    "url": "https://www.zeit.de/",
-//    "name": "DIE ZEIT"
-//  }
