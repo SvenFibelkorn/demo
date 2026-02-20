@@ -36,13 +36,13 @@ export const ORGANIZATION_FILTERS: OrganizationFilterOption[] = [
     name: 'Ars Technica',
   },
   {
-    label: 'FAZ',
-    slug: 'faz',
-    name: 'FAZ',
+    label: '404 Media',
+    slug: '404-media',
+    name: '404 Media',
   },
   {
     label: 'Deutsche Welle',
-    slug: 'dw',
+    slug: 'deutsche-welle',
     name: 'Deutsche Welle',
   },
   
