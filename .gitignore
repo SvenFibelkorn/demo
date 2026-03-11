@@ -10,6 +10,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+containers.md
 
 # =========================
 # Environment / Secrets
